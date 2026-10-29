@@ -103,4 +103,11 @@ $('#importFile').addEventListener('change',async e=>{let file=e.target.files[0];
 function exportCSV(){let rows=[['Fatura','Cliente','Emissão','Vencimento','Valor','Status','Pagamento'],...db.invoices.map(i=>[i.number,clientName(i.clientId),i.date,i.due,i.total,i.status,i.method])];let csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='faturas-nazagestao.csv';a.click();URL.revokeObjectURL(a.href)}
 function resetData(){if(confirm('Isso apagará os cadastros salvos neste navegador. Faça um backup antes. Continuar?')){db=structuredClone(defaultData);save()}}
 render();
+  .logo img {
+  display: block;
+  width: 100%;
+  max-width: 215px;
+  height: auto;
+  object-fit: contain;
+}
 </script></body></html>
