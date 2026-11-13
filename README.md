@@ -44,6 +44,6 @@ O arquivo `render.yaml` descreve a API no plano gratuito do Render. O comando de
 2. No Render, conecte este repositório e escolha **Blueprint** para detectar `render.yaml`.
 3. Preencha `DATABASE_URL` com a connection string do Neon e `CORS_ORIGIN` com a origem exata do frontend (sem barra no final). Não compartilhe esses valores em mensagens ou no Git.
 4. Aguarde o deploy e confirme que `/api/health` retorna `status: ok`.
-5. Faça o cadastro inicial usando `POST /api/auth/bootstrap` com o segredo `BOOTSTRAP_SECRET), guardado nas variáveis privadas do Render. Depois, remova/rotacione o segredo de bootstrap e mantenha-o fora do navegador.
+5. Faça o cadastro inicial usando `POST /api/auth/bootstrap` com o segredo `BOOTSTRAP_SECRET`, guardado nas variáveis privadas do Render. Depois, remova/rotacione o segredo de bootstrap e mantenha-o fora do navegador.
 
 **Importante:** esta configuração publica somente a API. O repositório ainda precisa de uma interface web completa e de testes de integração com PostgreSQL antes de ser considerado um ERP pronto para clientes. O plano gratuito pode suspender o serviço após inatividade; mantenha backups independentes do banco.
