@@ -1,20 +1,2 @@
-import { Router } from 'express';
-import { pool } from '../../db/pool.js';
-
-export const financeRouter = Router();
-
-financeRouter.get('/entries', async (request, response, next) => {
-  try {
-    const status = ['open', 'paid', 'cancelled'].includes(request.query.status) ? request.query.status : null;
-    const { rows } = await pool.query(
-      `SELECT id, sale_id, entry_type, description, amount, due_date, paid_at, status, payment_method, created_at
-       FROM financial_entries
-       WHERE ($1::text IS NULL OR status = $1)
-       ORDER BY due_date NULLS LAST, created_at DESC LIMIT 200`,
-      [status]
-    );
-    response.json({ entries: rows });
-  } catch (error) {
-    next(error);
-  }
-});
+import {Router} from 'express';import {withTenant} from '../../db/tenant.js';export const financeRouter=Router();
+financeRouter.get('/entries',async(req,res,next)=>{try{const status=['open','paid','cancelled'].includes(req.query.status)?req.query.status:null;const entries=await withTenant(req.user.companyId,async c=>(await c.query('SELECT id,sale_id,entry_type,description,amount,due_date,paid_at,status,payment_method,created_at FROM financial_entries WHERE company_id=$1 AND ($2::text IS NULL OR status=$2) ORDER BY due_date NULLS LAST,created_at DESC LIMIT 200',[req.user.companyId,status])).rows);res.json({entries});}catch(e){next(e);}});

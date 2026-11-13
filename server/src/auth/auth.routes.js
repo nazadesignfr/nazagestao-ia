@@ -1,37 +1,7 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import { bootstrapAdmin, login } from './auth.js';
-
-export const authRouter = Router();
-
-const bootstrapSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  email: z.string().email().max(160),
-  password: z.string().min(12).max(200),
-  bootstrapSecret: z.string().min(1)
-});
-const loginSchema = z.object({
-  email: z.string().email().max(160),
-  password: z.string().min(1).max(200)
-});
-
-authRouter.post('/bootstrap', async (request, response, next) => {
-  try {
-    const input = bootstrapSchema.parse(request.body);
-    const user = await bootstrapAdmin(input);
-    response.status(201).json({ user, message: 'Administrador criado. Faça login para continuar.' });
-  } catch (error) {
-    if (error.name === 'ZodError') return response.status(400).json({ error: 'Dados inválidos.', details: error.issues });
-    next(error);
-  }
-});
-
-authRouter.post('/login', async (request, response, next) => {
-  try {
-    const input = loginSchema.parse(request.body);
-    response.json(await login(input));
-  } catch (error) {
-    if (error.name === 'ZodError') return response.status(400).json({ error: 'Informe e-mail e senha válidos.' });
-    next(error);
-  }
-});
+import {Router} from 'express';import {z} from 'zod';import {bootstrapAdmin,login,listUserCompanies,createCompanyForUser,selectCompany,requireAuth} from './auth.js';
+export const authRouter=Router();
+authRouter.post('/bootstrap',async(req,res,next)=>{try{const d=z.object({name:z.string().trim().min(2).max(120),email:z.string().email().max(160),password:z.string().min(12).max(200),bootstrapSecret:z.string().min(1),companyName:z.string().trim().min(2).max(160).default('Minha Empresa')}).parse(req.body);res.status(201).json(await bootstrapAdmin(d));}catch(e){if(e.name==='ZodError')return res.status(400).json({error:'Dados inválidos.',details:e.issues});next(e);}});
+authRouter.post('/login',async(req,res,next)=>{try{res.json(await login(z.object({email:z.string().email(),password:z.string().min(1),companyId:z.number().int().positive().optional()}).parse(req.body)));}catch(e){if(e.name==='ZodError')return res.status(400).json({error:'Credenciais inválidas.'});if(e.companies)return res.status(400).json({error:e.message,companies:e.companies});next(e);}});
+authRouter.get('/companies',requireAuth,async(req,res,next)=>{try{res.json({companies:await listUserCompanies(req.user.id)});}catch(e){next(e);}});
+authRouter.post('/companies',requireAuth,async(req,res,next)=>{try{if(req.user.role!=='admin')return res.status(403).json({error:'Somente administrador pode criar empresas.'});const d=z.object({name:z.string().trim().min(2).max(160)}).parse(req.body);res.status(201).json({company:await createCompanyForUser(req.user.id,d.name)});}catch(e){if(e.name==='ZodError')return res.status(400).json({error:'Nome inválido.'});next(e);}});
+authRouter.post('/select-company',requireAuth,async(req,res,next)=>{try{const d=z.object({companyId:z.number().int().positive()}).parse(req.body);res.json(await selectCompany(req.user.id,d.companyId));}catch(e){if(e.name==='ZodError')return res.status(400).json({error:'Empresa inválida.'});next(e);}});

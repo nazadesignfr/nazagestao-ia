@@ -1,66 +1,16 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
-
-const secret = () => {
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-    throw new Error('JWT_SECRET deve ter pelo menos 32 caracteres.');
-  }
-  return process.env.JWT_SECRET;
-};
-
-export async function bootstrapAdmin({ name, email, password, bootstrapSecret }) {
-  if (!process.env.BOOTSTRAP_SECRET || bootstrapSecret !== process.env.BOOTSTRAP_SECRET) {
-    const error = new Error('Credencial de configuração inválida.');
-    error.status = 403;
-    throw error;
-  }
-  const count = await pool.query('SELECT COUNT(*)::int AS count FROM users');
-  if (count.rows[0].count > 0) {
-    const error = new Error('O usuário administrador já foi configurado.');
-    error.status = 409;
-    throw error;
-  }
-  const hash = await bcrypt.hash(password, 12);
-  const { rows } = await pool.query(
-    "INSERT INTO users (name, email, password_hash, role) VALUES ($1, LOWER($2), $3, 'admin') RETURNING id, name, email, role",
-    [name, email, hash]
-  );
-  return rows[0];
+const secret=()=>{if(!process.env.JWT_SECRET||process.env.JWT_SECRET.length<32)throw new Error('JWT_SECRET deve ter pelo menos 32 caracteres.');return process.env.JWT_SECRET;};
+const token=(user,m)=>jwt.sign({sub:String(user.id),companyId:Number(m.company_id),role:m.role},secret(),{expiresIn:'8h',issuer:'nazagestao-ia',audience:'nazagestao-api'});
+export async function bootstrapAdmin({name,email,password,bootstrapSecret,companyName='Minha Empresa'}){
+ if(!process.env.BOOTSTRAP_SECRET||bootstrapSecret!==process.env.BOOTSTRAP_SECRET){const e=new Error('Credencial de configuração inválida.');e.status=403;throw e;}
+ const c=await pool.connect();try{await c.query('BEGIN');const n=await c.query('SELECT COUNT(*)::int count FROM users');if(n.rows[0].count){const e=new Error('Configuração inicial já concluída.');e.status=409;throw e;}
+ const hash=await bcrypt.hash(password,12);const co=await c.query('INSERT INTO company(name) VALUES($1) RETURNING id,name',[companyName]);const u=await c.query("INSERT INTO users(name,email,password_hash,role) VALUES($1,LOWER($2),$3,'admin') RETURNING id,name,email",[name,email,hash]);await c.query("INSERT INTO user_companies(user_id,company_id,role) VALUES($1,$2,'admin')",[u.rows[0].id,co.rows[0].id]);await c.query('COMMIT');return {user:u.rows[0],company:co.rows[0]};}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
 }
-
-export async function login({ email, password }) {
-  const { rows } = await pool.query(
-    'SELECT id, name, email, password_hash, role, active FROM users WHERE email = LOWER($1)',
-    [email]
-  );
-  const user = rows[0];
-  if (!user || !user.active || !(await bcrypt.compare(password, user.password_hash))) {
-    const error = new Error('E-mail ou senha inválidos.');
-    error.status = 401;
-    throw error;
-  }
-  const token = jwt.sign({ sub: String(user.id), role: user.role }, secret(), { expiresIn: '8h', issuer: 'nazagestao-ia' });
-  return { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
-}
-
-export function requireAuth(request, response, next) {
-  const header = request.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  try {
-    const payload = jwt.verify(token, secret(), { issuer: 'nazagestao-ia' });
-    request.user = { id: Number(payload.sub), role: payload.role };
-    next();
-  } catch {
-    response.status(401).json({ error: 'Sessão inválida ou expirada. Entre novamente.' });
-  }
-}
-
-export function requireRole(...roles) {
-  return (request, response, next) => {
-    if (!request.user || !roles.includes(request.user.role)) {
-      return response.status(403).json({ error: 'Você não tem permissão para esta operação.' });
-    }
-    next();
-  };
-}
+export async function listUserCompanies(id){const {rows}=await pool.query('SELECT c.id,c.name,uc.role FROM user_companies uc JOIN company c ON c.id=uc.company_id WHERE uc.user_id=$1 AND uc.active ORDER BY c.name',[id]);return rows;}
+export async function login({email,password,companyId}){const {rows}=await pool.query('SELECT id,name,email,password_hash,active FROM users WHERE email=LOWER($1)',[email]);const u=rows[0];if(!u||!u.active||!(await bcrypt.compare(password,u.password_hash))){const e=new Error('E-mail ou senha inválidos.');e.status=401;throw e;}const companies=await listUserCompanies(u.id);const m=companyId?companies.find(x=>Number(x.id)===Number(companyId)):companies.length===1?companies[0]:null;if(!m){const e=new Error('Selecione uma empresa válida.');e.status=400;e.companies=companies;throw e;}return {token:token(u,{company_id:m.id,role:m.role}),user:{id:u.id,name:u.name,email:u.email,role:m.role},company:{id:m.id,name:m.name},companies};}
+export async function createCompanyForUser(userId,name){const c=await pool.connect();try{await c.query('BEGIN');const co=await c.query('INSERT INTO company(name) VALUES($1) RETURNING id,name',[name]);await c.query("INSERT INTO user_companies(user_id,company_id,role) VALUES($1,$2,'admin')",[userId,co.rows[0].id]);await c.query('COMMIT');return co.rows[0];}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
+export async function selectCompany(userId,companyId){const {rows}=await pool.query('SELECT c.id company_id,c.name,uc.role FROM user_companies uc JOIN company c ON c.id=uc.company_id WHERE uc.user_id=$1 AND uc.company_id=$2 AND uc.active',[userId,companyId]);if(!rows.length){const e=new Error('Você não tem acesso a esta empresa.');e.status=403;throw e;}const u=(await pool.query('SELECT id,name,email FROM users WHERE id=$1 AND active',[userId])).rows[0];return {token:token(u,rows[0]),company:{id:rows[0].company_id,name:rows[0].name},role:rows[0].role};}
+export function requireAuth(req,res,next){const h=req.headers.authorization||'',t=h.startsWith('Bearer ')?h.slice(7):'';try{const p=jwt.verify(t,secret(),{issuer:'nazagestao-ia',audience:'nazagestao-api'});const id=Number(p.sub),companyId=Number(p.companyId);if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(companyId)||companyId<1)return res.status(401).json({error:'Token inválido.'});pool.query('SELECT uc.role FROM user_companies uc JOIN users u ON u.id=uc.user_id WHERE uc.user_id=$1 AND uc.company_id=$2 AND uc.active AND u.active',[id,companyId]).then(({rows})=>{if(!rows.length)return res.status(401).json({error:'Acesso à empresa revogado.'});req.user={id,companyId,role:rows[0].role};next();}).catch(next);}catch{return res.status(401).json({error:'Sessão inválida ou expirada.'});}}
+export function requireRole(...roles){return(req,res,next)=>{if(!req.user||!roles.includes(req.user.role))return res.status(403).json({error:'Permissão insuficiente.'});next();};}
