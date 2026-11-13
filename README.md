@@ -35,3 +35,15 @@ Faça POST para `/api/auth/bootstrap` com `name`, `email`, `password` (mínimo 1
 A reconstrução ainda não inclui interface SaaS completa, cadastro/convite de usuários para empresas existentes, CRUD de clientes, fluxo de baixa/pagamento de contas a pagar e receber, planos/assinaturas, recuperação de senha, auditoria administrativa, nem configuração de hospedagem/backup/monitoramento. A migração ainda precisa ser aplicada e validada em um PostgreSQL real com backup. Não use dados reais antes dos testes de integração e revisão de segurança.
 
 Nunca publique o arquivo `.env` nem reutilize segredos de exemplo.
+
+## Implantação inicial (Render + Neon)
+
+O arquivo `render.yaml` descreve a API no plano gratuito do Render. O comando de inicialização executa primeiro `npm run db:migrate`, que prepara o schema e aplica a migração multiempresa uma única vez, com bloqueio no PostgreSQL para evitar duas migrações simultâneas.
+
+1. Crie um projeto PostgreSQL no Neon e copie a connection string com SSL.
+2. No Render, conecte este repositório e escolha **Blueprint** para detectar `render.yaml`.
+3. Preencha `DATABASE_URL` com a connection string do Neon e `CORS_ORIGIN` com a origem exata do frontend (sem barra no final). Não compartilhe esses valores em mensagens ou no Git.
+4. Aguarde o deploy e confirme que `/api/health` retorna `status: ok`.
+5. Faça o cadastro inicial usando `POST /api/auth/bootstrap` com o segredo `BOOTSTRAP_SECRET), guardado nas variáveis privadas do Render. Depois, remova/rotacione o segredo de bootstrap e mantenha-o fora do navegador.
+
+**Importante:** esta configuração publica somente a API. O repositório ainda precisa de uma interface web completa e de testes de integração com PostgreSQL antes de ser considerado um ERP pronto para clientes. O plano gratuito pode suspender o serviço após inatividade; mantenha backups independentes do banco.
