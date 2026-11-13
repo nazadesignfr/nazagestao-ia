@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: ohio
-    buildCommand: npm ci
+    buildCommand: npm install
     startCommand: npm run db:migrate && npm start
     healthCheckPath: /api/health
     envVars:
