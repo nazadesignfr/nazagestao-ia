@@ -1,5 +1,7 @@
-import {Router} from 'express';import {z} from 'zod';import {createSale} from './sales.service.js';import {salesListRouter} from './sales.list.routes.js';
+import {Router} from 'express';
+import {z} from 'zod';
+import {createSale} from './sales.service.js';
+
 export const salesRouter=Router();
 const schema=z.object({customerId:z.number().int().positive().nullable().optional(),discount:z.number().nonnegative().default(0),dueDate:z.string().date().nullable().optional(),paymentMethod:z.string().max(30).nullable().optional(),notes:z.string().max(2000).nullable().optional(),items:z.array(z.object({productId:z.number().int().positive(),quantity:z.number().positive(),unitPrice:z.number().nonnegative().optional()})).min(1)});
 salesRouter.post('/',async(req,res,next)=>{try{const d=schema.parse(req.body);res.status(201).json({sale:await createSale({...d,companyId:req.user.companyId,userId:req.user.id})});}catch(e){if(e.name==='ZodError')return res.status(400).json({error:'Dados da venda inválidos.',details:e.issues});if(/estoque|inválid|não encontrado|desconto/i.test(e.message))return res.status(422).json({error:e.message});next(e);}});
-salesRouter.use('/',salesListRouter);
