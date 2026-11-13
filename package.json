@@ -1,0 +1,23 @@
+{
+  "name": "nazagestao-ia",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de gestão empresarial NazaGestão IA",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server/src/index.js",
+    "start": "node server/src/index.js",
+    "db:migrate": "node server/src/db/migrate.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "pg": "^8.13.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {}
+}
