@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [main, rebuild/professional-foundation, fix/multitenant-security-foundation]
+  pull_request:
+    branches: [main, rebuild/professional-foundation]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: npm install
+      - run: npm test
+      - name: Check JavaScript syntax
+        run: find server -name '*.js' -print0 | xargs -0 -n1 node --check
